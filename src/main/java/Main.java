@@ -1,4 +1,6 @@
 import java.io.File;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Scanner;
 
 public class Main {
@@ -39,8 +41,7 @@ public class Main {
                     cmd.equals("pwd")) {
 
                     System.out.println(cmd + " is a shell builtin");
-                }
-                else {
+                } else {
 
                     String path = System.getenv("PATH");
                     String[] directories = path.split(":");
@@ -88,9 +89,15 @@ public class Main {
 
                 if (executable != null) {
 
-                    parts[0] = executable.getAbsolutePath();
+                    List<String> cmd = new ArrayList<>();
 
-                    ProcessBuilder pb = new ProcessBuilder(parts);
+                    cmd.add(executable.getAbsolutePath());
+
+                    for (int i = 1; i < parts.length; i++) {
+                        cmd.add(parts[i]);
+                    }
+
+                    ProcessBuilder pb = new ProcessBuilder(cmd);
                     pb.inheritIO();
 
                     Process process = pb.start();
