@@ -649,11 +649,16 @@ public class Main {
             case "cd" -> changeDirectory(args, err);
             case "type" -> typeCommand(args, out);
             case "jobs" -> listJobs(out);
-            case "complete" -> {
-            }
+            case "complete" -> completeCommand(args, out);
             case "exit" -> {
             }
             default -> writeTo(err, command + ": command not found\n");
+        }
+    }
+
+    private static void completeCommand(List<String> args, OutputStream out) throws IOException {
+        if (args.size() == 3 && args.get(1).equals("-p")) {
+            writeTo(out, "complete: " + args.get(2) + ": no completion specification\n");
         }
     }
 
