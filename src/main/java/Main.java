@@ -2,6 +2,7 @@ import java.io.File;
 import java.util.Scanner;
 
 public class Main {
+
     public static void main(String[] args) throws Exception {
 
         Scanner sc = new Scanner(System.in);
@@ -22,15 +23,20 @@ public class Main {
                 System.out.println(command.substring(5));
             }
 
+            // pwd builtin
+            else if (command.equals("pwd")) {
+                System.out.println(System.getProperty("user.dir"));
+            }
+
             // type builtin
             else if (command.startsWith("type ")) {
 
                 String cmd = command.substring(5);
 
-                // check builtins
                 if (cmd.equals("echo") ||
                     cmd.equals("exit") ||
-                    cmd.equals("type")) {
+                    cmd.equals("type") ||
+                    cmd.equals("pwd")) {
 
                     System.out.println(cmd + " is a shell builtin");
                 }
@@ -58,39 +64,42 @@ public class Main {
                 }
             }
 
-            // invalid command
+            // external programs
             else {
 
-    String[] parts = command.split(" ");
+                String[] parts = command.split(" ");
 
-    String program = parts[0];
+                String program = parts[0];
 
-    String path = System.getenv("PATH");
-    String[] directories = path.split(":");
+                String path = System.getenv("PATH");
+                String[] directories = path.split(":");
 
-    File executable = null;
+                File executable = null;
 
-    for (String dir : directories) {
-        File file = new File(dir, program);
+                for (String dir : directories) {
 
-        if (file.exists() && file.canExecute()) {
-            executable = file;
-            break;
-        }
-    }
+                    File file = new File(dir, program);
 
-    if (executable != null) {
+                    if (file.exists() && file.canExecute()) {
+                        executable = file;
+                        break;
+                    }
+                }
 
-        ProcessBuilder pb = new ProcessBuilder(parts);
-        pb.inheritIO();
+                if (executable != null) {
 
-        Process process = pb.start();
-        process.waitFor();
+                    parts[0] = executable.getAbsolutePath();
 
-    } else {
-        System.out.println(command + ": command not found");
-    }
-}
+                    ProcessBuilder pb = new ProcessBuilder(parts);
+                    pb.inheritIO();
+
+                    Process process = pb.start();
+                    process.waitFor();
+
+                } else {
+                    System.out.println(command + ": command not found");
+                }
+            }
         }
 
         sc.close();
