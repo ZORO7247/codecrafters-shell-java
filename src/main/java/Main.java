@@ -17,8 +17,28 @@ public class Main {
 
             char ch = input.charAt(i);
 
-            // Backslash outside quotes
-            if (ch == '\\' && !inSingleQuote && !inDoubleQuote) {
+            // Inside double quotes
+            if (inDoubleQuote && ch == '\\') {
+
+                if (i + 1 < input.length()) {
+
+                    char next = input.charAt(i + 1);
+
+                    if (next == '"' || next == '\\') {
+                        current.append(next);
+                        i++;
+                    } else {
+                        current.append('\\');
+                        current.append(next);
+                        i++;
+                    }
+                } else {
+                    current.append('\\');
+                }
+            }
+
+            // Outside quotes
+            else if (!inSingleQuote && !inDoubleQuote && ch == '\\') {
 
                 if (i + 1 < input.length()) {
                     current.append(input.charAt(i + 1));
@@ -26,17 +46,14 @@ public class Main {
                 }
             }
 
-            // Single quotes
             else if (ch == '\'' && !inDoubleQuote) {
                 inSingleQuote = !inSingleQuote;
             }
 
-            // Double quotes
             else if (ch == '"' && !inSingleQuote) {
                 inDoubleQuote = !inDoubleQuote;
             }
 
-            // Split on whitespace only when outside quotes
             else if (Character.isWhitespace(ch)
                     && !inSingleQuote
                     && !inDoubleQuote) {
@@ -62,7 +79,6 @@ public class Main {
     public static void main(String[] args) throws Exception {
 
         Scanner sc = new Scanner(System.in);
-
         String currentDirectory = System.getProperty("user.dir");
 
         while (true) {
@@ -79,12 +95,10 @@ public class Main {
 
             String command = tokens.get(0);
 
-            // exit
             if (command.equals("exit")) {
                 break;
             }
 
-            // echo
             else if (command.equals("echo")) {
 
                 for (int i = 1; i < tokens.size(); i++) {
@@ -99,12 +113,10 @@ public class Main {
                 System.out.println();
             }
 
-            // pwd
             else if (command.equals("pwd")) {
                 System.out.println(currentDirectory);
             }
 
-            // cd
             else if (command.equals("cd")) {
 
                 if (tokens.size() < 2) {
@@ -132,7 +144,6 @@ public class Main {
                 }
             }
 
-            // type
             else if (command.equals("type")) {
 
                 if (tokens.size() < 2) {
@@ -173,7 +184,6 @@ public class Main {
                 }
             }
 
-            // external commands
             else {
 
                 try {
