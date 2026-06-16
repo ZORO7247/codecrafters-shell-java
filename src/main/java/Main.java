@@ -17,7 +17,6 @@ public class Main {
 
             char ch = input.charAt(i);
 
-            // Inside double quotes
             if (inDoubleQuote && ch == '\\') {
 
                 if (i + 1 < input.length()) {
@@ -37,7 +36,6 @@ public class Main {
                 }
             }
 
-            // Outside quotes
             else if (!inSingleQuote && !inDoubleQuote && ch == '\\') {
 
                 if (i + 1 < input.length()) {
@@ -93,6 +91,25 @@ public class Main {
                 continue;
             }
 
+            String outputFile = null;
+
+            for (int i = 0; i < tokens.size(); i++) {
+
+                if (tokens.get(i).equals(">") || tokens.get(i).equals("1>")) {
+
+                    if (i + 1 < tokens.size()) {
+                        outputFile = tokens.get(i + 1);
+                    }
+
+                    tokens = new ArrayList<>(tokens.subList(0, i));
+                    break;
+                }
+            }
+
+            if (tokens.isEmpty()) {
+                continue;
+            }
+
             String command = tokens.get(0);
 
             if (command.equals("exit")) {
@@ -101,20 +118,37 @@ public class Main {
 
             else if (command.equals("echo")) {
 
+                StringBuilder output = new StringBuilder();
+
                 for (int i = 1; i < tokens.size(); i++) {
 
                     if (i > 1) {
-                        System.out.print(" ");
+                        output.append(" ");
                     }
 
-                    System.out.print(tokens.get(i));
+                    output.append(tokens.get(i));
                 }
 
-                System.out.println();
+                if (outputFile != null) {
+                    java.nio.file.Files.writeString(
+                            java.nio.file.Path.of(outputFile),
+                            output + System.lineSeparator()
+                    );
+                } else {
+                    System.out.println(output);
+                }
             }
 
             else if (command.equals("pwd")) {
-                System.out.println(currentDirectory);
+
+                if (outputFile != null) {
+                    java.nio.file.Files.writeString(
+                            java.nio.file.Path.of(outputFile),
+                            currentDirectory + System.lineSeparator()
+                    );
+                } else {
+                    System.out.println(currentDirectory);
+                }
             }
 
             else if (command.equals("cd")) {
@@ -151,6 +185,7 @@ public class Main {
                 }
 
                 String cmd = tokens.get(1);
+                String result;
 
                 if (cmd.equals("echo") ||
                     cmd.equals("exit") ||
@@ -158,29 +193,33 @@ public class Main {
                     cmd.equals("pwd") ||
                     cmd.equals("cd")) {
 
-                    System.out.println(cmd + " is a shell builtin");
+                    result = cmd + " is a shell builtin";
                 }
                 else {
 
                     String path = System.getenv("PATH");
                     String[] dirs = path.split(":");
 
-                    boolean found = false;
+                    result = cmd + ": not found";
 
                     for (String dir : dirs) {
 
                         File file = new File(dir, cmd);
 
                         if (file.exists() && file.canExecute()) {
-                            System.out.println(cmd + " is " + file.getAbsolutePath());
-                            found = true;
+                            result = cmd + " is " + file.getAbsolutePath();
                             break;
                         }
                     }
+                }
 
-                    if (!found) {
-                        System.out.println(cmd + ": not found");
-                    }
+                if (outputFile != null) {
+                    java.nio.file.Files.writeString(
+                            java.nio.file.Path.of(outputFile),
+                            result + System.lineSeparator()
+                    );
+                } else {
+                    System.out.println(result);
                 }
             }
 
@@ -191,7 +230,12 @@ public class Main {
                     ProcessBuilder pb = new ProcessBuilder(tokens);
 
                     pb.directory(new File(currentDirectory));
-                    pb.inheritIO();
+
+                    if (outputFile != null) {
+                        pb.redirectOutput(new File(outputFile));
+                    } else {
+                        pb.inheritIO();
+                    }
 
                     Process process = pb.start();
                     process.waitFor();
