@@ -407,13 +407,16 @@ public class Main {
         for (File file : files) {
             String name = file.getName();
             if (name.startsWith(filePrefix)) {
-                candidates.add(directoryPart + name);
+                candidates.add(directoryPart + name + (file.isDirectory() ? "/" : ""));
             }
         }
         return new ArrayList<>(candidates);
     }
 
     private static String completionSuffix(String value) {
+        if (value.endsWith("/")) {
+            return "";
+        }
         File file = resolvePath(value);
         return file.isDirectory() ? "/" : " ";
     }
