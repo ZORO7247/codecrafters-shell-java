@@ -60,8 +60,37 @@ public class Main {
 
             // invalid command
             else {
-                System.out.println(command + ": command not found");
-            }
+
+    String[] parts = command.split(" ");
+
+    String program = parts[0];
+
+    String path = System.getenv("PATH");
+    String[] directories = path.split(":");
+
+    File executable = null;
+
+    for (String dir : directories) {
+        File file = new File(dir, program);
+
+        if (file.exists() && file.canExecute()) {
+            executable = file;
+            break;
+        }
+    }
+
+    if (executable != null) {
+
+        ProcessBuilder pb = new ProcessBuilder(parts);
+        pb.inheritIO();
+
+        Process process = pb.start();
+        process.waitFor();
+
+    } else {
+        System.out.println(command + ": command not found");
+    }
+}
         }
 
         sc.close();
