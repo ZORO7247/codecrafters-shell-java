@@ -15,27 +15,38 @@ public class Main {
 
             String command = sc.nextLine();
 
+            // exit builtin
             if (command.equals("exit")) {
                 break;
             }
 
+            // echo builtin
             else if (command.startsWith("echo ")) {
                 System.out.println(command.substring(5));
             }
 
+            // pwd builtin
             else if (command.equals("pwd")) {
                 System.out.println(currentDirectory);
             }
 
+            // cd builtin
             else if (command.startsWith("cd ")) {
 
                 String path = command.substring(3);
 
                 File targetDir;
 
-                if (path.startsWith("/")) {
+                // Handle ~
+                if (path.equals("~")) {
+                    targetDir = new File(System.getenv("HOME"));
+                }
+                // Absolute path
+                else if (path.startsWith("/")) {
                     targetDir = new File(path);
-                } else {
+                }
+                // Relative path
+                else {
                     targetDir = new File(currentDirectory, path);
                 }
 
@@ -46,6 +57,7 @@ public class Main {
                 }
             }
 
+            // type builtin
             else if (command.startsWith("type ")) {
 
                 String cmd = command.substring(5);
@@ -82,6 +94,7 @@ public class Main {
                 }
             }
 
+            // External programs
             else {
 
                 String[] parts = command.split(" ");
