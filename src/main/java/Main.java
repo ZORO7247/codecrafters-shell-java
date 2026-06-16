@@ -62,11 +62,13 @@ public class Main {
         private final int tokenStart;
         private final String prefix;
         private final boolean commandPosition;
+        private final List<String> tokens;
 
-        private CompletionContext(int tokenStart, String prefix, boolean commandPosition) {
+        private CompletionContext(int tokenStart, String prefix, boolean commandPosition, List<String> tokens) {
             this.tokenStart = tokenStart;
             this.prefix = prefix;
             this.commandPosition = commandPosition;
+            this.tokens = tokens;
         }
 
         private String key() {
@@ -311,7 +313,7 @@ public class Main {
     ) {
         List<String> matches = context.commandPosition
                 ? commandCompletionCandidates(context.prefix)
-                : fileCompletionCandidates(context.prefix);
+                : argumentCompletionCandidates(line.toString(), context);
 
         if (matches.size() == 1) {
             String completion = matches.get(0).substring(context.prefix.length()) + completionSuffix(matches.get(0));
@@ -358,7 +360,7 @@ public class Main {
         }
         String prefix = value.substring(tokenStart);
         boolean commandPosition = value.substring(0, tokenStart).isBlank();
-        return new CompletionContext(tokenStart, prefix, commandPosition);
+        return new CompletionContext(tokenStart, prefix, commandPosition, tokenize(value));
     }
 
     private static List<String> commandCompletionCandidates(String prefix) {
@@ -412,6 +414,62 @@ public class Main {
             }
         }
         return new ArrayList<>(candidates);
+    }
+
+    private static List<String> argumentCompletionCandidates(String line, CompletionContext context) {
+        if (!context.tokens.isEmpty()) {
+            String completer = completionSpecs.get(context.tokens.get(0));
+            if (completer != null) {
+                List<String> completions = programmableCompletionCandidates(completer, line, context);
+                if (!completions.isEmpty()) {
+                    return completions;
+                }
+            }
+        }
+        return fileCompletionCandidates(context.prefix);
+    }
+
+    private static List<String> programmableCompletionCandidates(
+            String completer,
+            String line,
+            CompletionContext context
+    ) {
+        try {
+            ProcessBuilder processBuilder = new ProcessBuilder(
+                    completer,
+                    context.tokens.get(0),
+                    context.prefix,
+                    previousToken(context)
+            );
+            processBuilder.directory(new File(currentDirectory));
+            processBuilder.environment().put("COMP_LINE", line);
+            processBuilder.environment().put("COMP_POINT", String.valueOf(line.length()));
+            processBuilder.redirectError(ProcessBuilder.Redirect.DISCARD);
+
+            Process process = processBuilder.start();
+            String output = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+            int exitCode = process.waitFor();
+            if (exitCode != 0) {
+                return new ArrayList<>();
+            }
+
+            TreeSet<String> candidates = new TreeSet<>();
+            for (String candidate : output.split("\\R")) {
+                if (!candidate.isEmpty() && candidate.startsWith(context.prefix)) {
+                    candidates.add(candidate);
+                }
+            }
+            return new ArrayList<>(candidates);
+        } catch (Exception e) {
+            return new ArrayList<>();
+        }
+    }
+
+    private static String previousToken(CompletionContext context) {
+        if (context.tokens.size() < 2) {
+            return "";
+        }
+        return context.tokens.get(context.tokens.size() - 2);
     }
 
     private static String completionSuffix(String value) {
