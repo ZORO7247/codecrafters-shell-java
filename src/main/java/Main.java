@@ -8,19 +8,24 @@ public class Main {
     private static List<String> parseCommand(String input) {
 
         List<String> tokens = new ArrayList<>();
-
         StringBuilder current = new StringBuilder();
 
         boolean inSingleQuote = false;
+        boolean inDoubleQuote = false;
 
         for (int i = 0; i < input.length(); i++) {
 
             char ch = input.charAt(i);
 
-            if (ch == '\'') {
+            if (ch == '\'' && !inDoubleQuote) {
                 inSingleQuote = !inSingleQuote;
             }
-            else if (Character.isWhitespace(ch) && !inSingleQuote) {
+            else if (ch == '"' && !inSingleQuote) {
+                inDoubleQuote = !inDoubleQuote;
+            }
+            else if (Character.isWhitespace(ch) &&
+                    !inSingleQuote &&
+                    !inDoubleQuote) {
 
                 if (current.length() > 0) {
                     tokens.add(current.toString());
@@ -87,6 +92,10 @@ public class Main {
             // cd
             else if (command.equals("cd")) {
 
+                if (tokens.size() < 2) {
+                    continue;
+                }
+
                 String path = tokens.get(1);
 
                 File targetDir;
@@ -110,6 +119,10 @@ public class Main {
 
             // type
             else if (command.equals("type")) {
+
+                if (tokens.size() < 2) {
+                    continue;
+                }
 
                 String cmd = tokens.get(1);
 
