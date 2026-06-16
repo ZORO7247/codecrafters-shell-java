@@ -1,7 +1,43 @@
 import java.io.File;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Scanner;
 
 public class Main {
+
+    private static List<String> parseCommand(String input) {
+
+        List<String> tokens = new ArrayList<>();
+
+        StringBuilder current = new StringBuilder();
+
+        boolean inSingleQuote = false;
+
+        for (int i = 0; i < input.length(); i++) {
+
+            char ch = input.charAt(i);
+
+            if (ch == '\'') {
+                inSingleQuote = !inSingleQuote;
+            }
+            else if (Character.isWhitespace(ch) && !inSingleQuote) {
+
+                if (current.length() > 0) {
+                    tokens.add(current.toString());
+                    current.setLength(0);
+                }
+            }
+            else {
+                current.append(ch);
+            }
+        }
+
+        if (current.length() > 0) {
+            tokens.add(current.toString());
+        }
+
+        return tokens;
+    }
 
     public static void main(String[] args) throws Exception {
 
@@ -13,39 +49,54 @@ public class Main {
 
             System.out.print("$ ");
 
-            String command = sc.nextLine();
+            String commandLine = sc.nextLine();
 
-            // exit builtin
+            List<String> tokens = parseCommand(commandLine);
+
+            if (tokens.isEmpty()) {
+                continue;
+            }
+
+            String command = tokens.get(0);
+
+            // exit
             if (command.equals("exit")) {
                 break;
             }
 
-            // echo builtin
-            else if (command.startsWith("echo ")) {
-                System.out.println(command.substring(5));
+            // echo
+            else if (command.equals("echo")) {
+
+                for (int i = 1; i < tokens.size(); i++) {
+
+                    if (i > 1) {
+                        System.out.print(" ");
+                    }
+
+                    System.out.print(tokens.get(i));
+                }
+
+                System.out.println();
             }
 
-            // pwd builtin
+            // pwd
             else if (command.equals("pwd")) {
                 System.out.println(currentDirectory);
             }
 
-            // cd builtin
-            else if (command.startsWith("cd ")) {
+            // cd
+            else if (command.equals("cd")) {
 
-                String path = command.substring(3);
+                String path = tokens.get(1);
 
                 File targetDir;
 
-                // Handle ~
                 if (path.equals("~")) {
                     targetDir = new File(System.getenv("HOME"));
                 }
-                // Absolute path
                 else if (path.startsWith("/")) {
                     targetDir = new File(path);
                 }
-                // Relative path
                 else {
                     targetDir = new File(currentDirectory, path);
                 }
@@ -57,10 +108,10 @@ public class Main {
                 }
             }
 
-            // type builtin
-            else if (command.startsWith("type ")) {
+            // type
+            else if (command.equals("type")) {
 
-                String cmd = command.substring(5);
+                String cmd = tokens.get(1);
 
                 if (cmd.equals("echo") ||
                     cmd.equals("exit") ||
@@ -73,11 +124,11 @@ public class Main {
                 else {
 
                     String path = System.getenv("PATH");
-                    String[] directories = path.split(":");
+                    String[] dirs = path.split(":");
 
                     boolean found = false;
 
-                    for (String dir : directories) {
+                    for (String dir : dirs) {
 
                         File file = new File(dir, cmd);
 
@@ -94,17 +145,14 @@ public class Main {
                 }
             }
 
-            // External programs
+            // external commands
             else {
-
-                String[] parts = command.split(" ");
 
                 try {
 
-                    ProcessBuilder pb = new ProcessBuilder(parts);
+                    ProcessBuilder pb = new ProcessBuilder(tokens);
 
                     pb.directory(new File(currentDirectory));
-
                     pb.inheritIO();
 
                     Process process = pb.start();
