@@ -31,10 +31,16 @@ public class Main {
 
                 String path = command.substring(3);
 
-                File dir = new File(path);
+                File targetDir;
 
-                if (dir.exists() && dir.isDirectory()) {
-                    currentDirectory = dir.getCanonicalPath();
+                if (path.startsWith("/")) {
+                    targetDir = new File(path);
+                } else {
+                    targetDir = new File(currentDirectory, path);
+                }
+
+                if (targetDir.exists() && targetDir.isDirectory()) {
+                    currentDirectory = targetDir.getCanonicalPath();
                 } else {
                     System.out.println("cd: " + path + ": No such file or directory");
                 }
