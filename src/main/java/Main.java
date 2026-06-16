@@ -17,7 +17,7 @@ import java.util.Map;
 import java.util.TreeSet;
 
 public class Main {
-    private static final String[] BUILTINS = {"echo", "exit", "type", "pwd", "cd", "jobs"};
+    private static final String[] BUILTINS = {"echo", "exit", "type", "pwd", "cd", "jobs", "complete"};
     private static final int BACKSPACE = 127;
 
     private static String currentDirectory = System.getProperty("user.dir");
@@ -649,6 +649,8 @@ public class Main {
             case "cd" -> changeDirectory(args, err);
             case "type" -> typeCommand(args, out);
             case "jobs" -> listJobs(out);
+            case "complete" -> {
+            }
             case "exit" -> {
             }
             default -> writeTo(err, command + ": command not found\n");
