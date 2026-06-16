@@ -95,7 +95,8 @@ public class Main {
 
             for (int i = 0; i < tokens.size(); i++) {
 
-                if (tokens.get(i).equals(">") || tokens.get(i).equals("1>")) {
+                if (tokens.get(i).equals(">") ||
+                    tokens.get(i).equals("1>")) {
 
                     if (i + 1 < tokens.size()) {
                         outputFile = tokens.get(i + 1);
@@ -112,10 +113,12 @@ public class Main {
 
             String command = tokens.get(0);
 
+            // exit
             if (command.equals("exit")) {
                 break;
             }
 
+            // echo
             else if (command.equals("echo")) {
 
                 StringBuilder output = new StringBuilder();
@@ -130,27 +133,33 @@ public class Main {
                 }
 
                 if (outputFile != null) {
+
                     java.nio.file.Files.writeString(
                             java.nio.file.Path.of(outputFile),
-                            output + System.lineSeparator()
-                    );
+                            output + System.lineSeparator());
+
                 } else {
+
                     System.out.println(output);
                 }
             }
 
+            // pwd
             else if (command.equals("pwd")) {
 
                 if (outputFile != null) {
+
                     java.nio.file.Files.writeString(
                             java.nio.file.Path.of(outputFile),
-                            currentDirectory + System.lineSeparator()
-                    );
+                            currentDirectory + System.lineSeparator());
+
                 } else {
+
                     System.out.println(currentDirectory);
                 }
             }
 
+            // cd
             else if (command.equals("cd")) {
 
                 if (tokens.size() < 2) {
@@ -178,6 +187,7 @@ public class Main {
                 }
             }
 
+            // type
             else if (command.equals("type")) {
 
                 if (tokens.size() < 2) {
@@ -185,6 +195,7 @@ public class Main {
                 }
 
                 String cmd = tokens.get(1);
+
                 String result;
 
                 if (cmd.equals("echo") ||
@@ -214,15 +225,18 @@ public class Main {
                 }
 
                 if (outputFile != null) {
+
                     java.nio.file.Files.writeString(
                             java.nio.file.Path.of(outputFile),
-                            result + System.lineSeparator()
-                    );
+                            result + System.lineSeparator());
+
                 } else {
+
                     System.out.println(result);
                 }
             }
 
+            // external commands
             else {
 
                 try {
@@ -232,8 +246,12 @@ public class Main {
                     pb.directory(new File(currentDirectory));
 
                     if (outputFile != null) {
+
                         pb.redirectOutput(new File(outputFile));
+                        pb.redirectError(ProcessBuilder.Redirect.INHERIT);
+
                     } else {
+
                         pb.inheritIO();
                     }
 
