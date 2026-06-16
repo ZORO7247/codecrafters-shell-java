@@ -9,13 +9,16 @@ import java.nio.file.OpenOption;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.TreeSet;
 
 public class Main {
     private static final String[] BUILTINS = {"echo", "exit", "type", "pwd", "cd", "jobs"};
+    private static final int BACKSPACE = 127;
 
     private static String currentDirectory = System.getProperty("user.dir");
     private static final Map<Integer, Job> jobs = new HashMap<>();
@@ -202,40 +205,208 @@ public class Main {
 
     private static void repl() throws Exception {
         InputStream in = System.in;
+        String originalTerminalMode = enableCharacterInput();
+        boolean echoInput = originalTerminalMode != null;
+
+        try {
+            while (true) {
+                reapCompletedJobs();
+                System.out.print("$ ");
+                System.out.flush();
+
+                String line = readLine(in, echoInput);
+                if (line == null) {
+                    break;
+                }
+
+                ParsedLine parsed = parseLine(line);
+                if (parsed.commands.isEmpty()) {
+                    continue;
+                }
+
+                if (parsed.commands.size() == 1) {
+                    ShellCommand command = parsed.commands.get(0);
+                    if (command.args.get(0).equals("exit")) {
+                        break;
+                    }
+                    if (parsed.background) {
+                        startBackgroundJob(command, parsed.originalCommand);
+                    } else {
+                        executeForeground(command);
+                    }
+                } else {
+                    executePipeline(parsed.commands);
+                }
+            }
+        } finally {
+            restoreTerminalMode(originalTerminalMode);
+        }
+    }
+
+    private static String readLine(InputStream in, boolean echoInput) throws IOException {
         StringBuilder line = new StringBuilder();
+        String lastCompletionPrefix = null;
 
         while (true) {
-            reapCompletedJobs();
-            System.out.print("$ ");
-            System.out.flush();
-
-            line.setLength(0);
-            int next;
-            while ((next = in.read()) != -1 && next != '\n') {
-                line.append((char) next);
+            int next = in.read();
+            if (next == -1) {
+                return line.isEmpty() ? null : line.toString();
             }
-            if (next == -1 && line.isEmpty()) {
-                break;
+            if (next == '\n' || next == '\r') {
+                if (echoInput) {
+                    System.out.println();
+                    System.out.flush();
+                }
+                return line.toString();
             }
-
-            ParsedLine parsed = parseLine(line.toString());
-            if (parsed.commands.isEmpty()) {
+            if (next == '\t') {
+                String prefix = currentCommandPrefix(line);
+                completeCommand(line, echoInput, prefix.equals(lastCompletionPrefix));
+                lastCompletionPrefix = currentCommandPrefix(line);
+                continue;
+            }
+            if (next == BACKSPACE || next == '\b') {
+                lastCompletionPrefix = null;
+                if (!line.isEmpty()) {
+                    line.deleteCharAt(line.length() - 1);
+                    if (echoInput) {
+                        System.out.print("\b \b");
+                        System.out.flush();
+                    }
+                }
                 continue;
             }
 
-            if (parsed.commands.size() == 1) {
-                ShellCommand command = parsed.commands.get(0);
-                if (command.args.get(0).equals("exit")) {
-                    break;
-                }
-                if (parsed.background) {
-                    startBackgroundJob(command, parsed.originalCommand);
-                } else {
-                    executeForeground(command);
-                }
-            } else {
-                executePipeline(parsed.commands);
+            lastCompletionPrefix = null;
+            line.append((char) next);
+            if (echoInput) {
+                System.out.print((char) next);
+                System.out.flush();
             }
+        }
+    }
+
+    private static void completeCommand(StringBuilder line, boolean echoInput, boolean repeatedTab) {
+        String prefix = currentCommandPrefix(line);
+        if (prefix == null) {
+            return;
+        }
+
+        List<String> matches = completionCandidates(prefix);
+
+        if (matches.size() == 1) {
+            String completion = matches.get(0).substring(prefix.length()) + " ";
+            line.append(completion);
+            if (echoInput) {
+                System.out.print(completion);
+                System.out.flush();
+            }
+            return;
+        }
+
+        if (matches.size() > 1) {
+            String commonPrefix = commonPrefix(matches);
+            if (commonPrefix.length() > prefix.length()) {
+                String completion = commonPrefix.substring(prefix.length());
+                line.append(completion);
+                if (echoInput) {
+                    System.out.print(completion);
+                    System.out.flush();
+                }
+                return;
+            }
+
+            if (repeatedTab && echoInput) {
+                System.out.println();
+                System.out.println(String.join("  ", matches));
+                System.out.print("$ " + line);
+                System.out.flush();
+                return;
+            }
+        }
+
+        if (echoInput) {
+            System.out.print("\u0007");
+            System.out.flush();
+        }
+    }
+
+    private static String currentCommandPrefix(StringBuilder line) {
+        String value = line.toString();
+        return value.chars().anyMatch(Character::isWhitespace) ? null : value;
+    }
+
+    private static List<String> completionCandidates(String prefix) {
+        TreeSet<String> candidates = new TreeSet<>();
+        Arrays.stream(BUILTINS)
+                .filter(command -> command.startsWith(prefix))
+                .forEach(candidates::add);
+
+        String path = System.getenv("PATH");
+        if (path != null) {
+            for (String dir : path.split(":")) {
+                File directory = new File(dir);
+                File[] files = directory.listFiles();
+                if (files == null) {
+                    continue;
+                }
+                for (File file : files) {
+                    String name = file.getName();
+                    if (name.startsWith(prefix) && file.isFile() && file.canExecute()) {
+                        candidates.add(name);
+                    }
+                }
+            }
+        }
+
+        return new ArrayList<>(candidates);
+    }
+
+    private static String commonPrefix(List<String> values) {
+        String prefix = values.get(0);
+        for (int i = 1; i < values.size(); i++) {
+            String value = values.get(i);
+            int length = 0;
+            while (length < prefix.length()
+                    && length < value.length()
+                    && prefix.charAt(length) == value.charAt(length)) {
+                length++;
+            }
+            prefix = prefix.substring(0, length);
+        }
+        return prefix;
+    }
+
+    private static String enableCharacterInput() {
+        String originalMode = runStty("-g");
+        if (originalMode == null) {
+            return null;
+        }
+        if (runStty("-echo -icanon min 1 time 0") == null) {
+            return null;
+        }
+        return originalMode;
+    }
+
+    private static void restoreTerminalMode(String originalMode) {
+        if (originalMode != null && !originalMode.isBlank()) {
+            runStty(originalMode);
+        }
+    }
+
+    private static String runStty(String arguments) {
+        try {
+            Process process = new ProcessBuilder("sh", "-c", "stty " + arguments + " < /dev/tty")
+                    .redirectError(ProcessBuilder.Redirect.DISCARD)
+                    .start();
+            byte[] output = process.getInputStream().readAllBytes();
+            int exitCode = process.waitFor();
+            if (exitCode != 0) {
+                return null;
+            }
+            return new String(output, StandardCharsets.UTF_8).trim();
+        } catch (Exception e) {
+            return null;
         }
     }
 
