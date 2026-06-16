@@ -57,6 +57,22 @@ public class Main {
         }
     }
 
+    private static class CompletionContext {
+        private final int tokenStart;
+        private final String prefix;
+        private final boolean commandPosition;
+
+        private CompletionContext(int tokenStart, String prefix, boolean commandPosition) {
+            this.tokenStart = tokenStart;
+            this.prefix = prefix;
+            this.commandPosition = commandPosition;
+        }
+
+        private String key() {
+            return commandPosition + ":" + tokenStart + ":" + prefix;
+        }
+    }
+
     private static List<String> tokenize(String input) {
         List<String> tokens = new ArrayList<>();
         StringBuilder current = new StringBuilder();
@@ -245,7 +261,7 @@ public class Main {
 
     private static String readLine(InputStream in, boolean echoInput) throws IOException {
         StringBuilder line = new StringBuilder();
-        String lastCompletionPrefix = null;
+        String lastCompletionKey = null;
 
         while (true) {
             int next = in.read();
@@ -260,13 +276,13 @@ public class Main {
                 return line.toString();
             }
             if (next == '\t') {
-                String prefix = currentCommandPrefix(line);
-                completeCommand(line, echoInput, prefix.equals(lastCompletionPrefix));
-                lastCompletionPrefix = currentCommandPrefix(line);
+                CompletionContext context = completionContext(line);
+                completeLine(line, context, echoInput, context.key().equals(lastCompletionKey));
+                lastCompletionKey = completionContext(line).key();
                 continue;
             }
             if (next == BACKSPACE || next == '\b') {
-                lastCompletionPrefix = null;
+                lastCompletionKey = null;
                 if (!line.isEmpty()) {
                     line.deleteCharAt(line.length() - 1);
                     if (echoInput) {
@@ -277,7 +293,7 @@ public class Main {
                 continue;
             }
 
-            lastCompletionPrefix = null;
+            lastCompletionKey = null;
             line.append((char) next);
             if (echoInput) {
                 System.out.print((char) next);
@@ -286,16 +302,18 @@ public class Main {
         }
     }
 
-    private static void completeCommand(StringBuilder line, boolean echoInput, boolean repeatedTab) {
-        String prefix = currentCommandPrefix(line);
-        if (prefix == null) {
-            return;
-        }
-
-        List<String> matches = completionCandidates(prefix);
+    private static void completeLine(
+            StringBuilder line,
+            CompletionContext context,
+            boolean echoInput,
+            boolean repeatedTab
+    ) {
+        List<String> matches = context.commandPosition
+                ? commandCompletionCandidates(context.prefix)
+                : fileCompletionCandidates(context.prefix);
 
         if (matches.size() == 1) {
-            String completion = matches.get(0).substring(prefix.length()) + " ";
+            String completion = matches.get(0).substring(context.prefix.length()) + completionSuffix(matches.get(0));
             line.append(completion);
             if (echoInput) {
                 System.out.print(completion);
@@ -306,8 +324,8 @@ public class Main {
 
         if (matches.size() > 1) {
             String commonPrefix = commonPrefix(matches);
-            if (commonPrefix.length() > prefix.length()) {
-                String completion = commonPrefix.substring(prefix.length());
+            if (commonPrefix.length() > context.prefix.length()) {
+                String completion = commonPrefix.substring(context.prefix.length());
                 line.append(completion);
                 if (echoInput) {
                     System.out.print(completion);
@@ -331,12 +349,18 @@ public class Main {
         }
     }
 
-    private static String currentCommandPrefix(StringBuilder line) {
+    private static CompletionContext completionContext(StringBuilder line) {
         String value = line.toString();
-        return value.chars().anyMatch(Character::isWhitespace) ? null : value;
+        int tokenStart = value.length();
+        while (tokenStart > 0 && !Character.isWhitespace(value.charAt(tokenStart - 1))) {
+            tokenStart--;
+        }
+        String prefix = value.substring(tokenStart);
+        boolean commandPosition = value.substring(0, tokenStart).isBlank();
+        return new CompletionContext(tokenStart, prefix, commandPosition);
     }
 
-    private static List<String> completionCandidates(String prefix) {
+    private static List<String> commandCompletionCandidates(String prefix) {
         TreeSet<String> candidates = new TreeSet<>();
         Arrays.stream(BUILTINS)
                 .filter(command -> command.startsWith(prefix))
@@ -360,6 +384,51 @@ public class Main {
         }
 
         return new ArrayList<>(candidates);
+    }
+
+    private static List<String> fileCompletionCandidates(String prefix) {
+        TreeSet<String> candidates = new TreeSet<>();
+        String directoryPart = "";
+        String filePrefix = prefix;
+        int slashIndex = prefix.lastIndexOf('/');
+        if (slashIndex >= 0) {
+            directoryPart = prefix.substring(0, slashIndex + 1);
+            filePrefix = prefix.substring(slashIndex + 1);
+        }
+
+        File directory = directoryPart.isEmpty()
+                ? new File(currentDirectory)
+                : resolvePath(directoryPart);
+        File[] files = directory.listFiles();
+        if (files == null) {
+            return new ArrayList<>();
+        }
+
+        for (File file : files) {
+            String name = file.getName();
+            if (name.startsWith(filePrefix)) {
+                candidates.add(directoryPart + name);
+            }
+        }
+        return new ArrayList<>(candidates);
+    }
+
+    private static String completionSuffix(String value) {
+        File file = resolvePath(value);
+        return file.isDirectory() ? "/" : " ";
+    }
+
+    private static File resolvePath(String path) {
+        if (path.equals("~")) {
+            return new File(System.getenv("HOME"));
+        }
+        if (path.startsWith("~/")) {
+            return new File(System.getenv("HOME"), path.substring(2));
+        }
+        if (path.startsWith("/")) {
+            return new File(path);
+        }
+        return new File(currentDirectory, path);
     }
 
     private static String commonPrefix(List<String> values) {
