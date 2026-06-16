@@ -17,21 +17,36 @@ public class Main {
 
             char ch = input.charAt(i);
 
-            if (ch == '\'' && !inDoubleQuote) {
+            // Backslash outside quotes
+            if (ch == '\\' && !inSingleQuote && !inDoubleQuote) {
+
+                if (i + 1 < input.length()) {
+                    current.append(input.charAt(i + 1));
+                    i++;
+                }
+            }
+
+            // Single quotes
+            else if (ch == '\'' && !inDoubleQuote) {
                 inSingleQuote = !inSingleQuote;
             }
+
+            // Double quotes
             else if (ch == '"' && !inSingleQuote) {
                 inDoubleQuote = !inDoubleQuote;
             }
-            else if (Character.isWhitespace(ch) &&
-                    !inSingleQuote &&
-                    !inDoubleQuote) {
+
+            // Split on whitespace only when outside quotes
+            else if (Character.isWhitespace(ch)
+                    && !inSingleQuote
+                    && !inDoubleQuote) {
 
                 if (current.length() > 0) {
                     tokens.add(current.toString());
                     current.setLength(0);
                 }
             }
+
             else {
                 current.append(ch);
             }
