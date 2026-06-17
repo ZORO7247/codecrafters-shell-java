@@ -791,13 +791,24 @@ public class Main {
     }
 
     private static void listJobs(OutputStream out) throws IOException {
-        reapCompletedJobs();
-        List<Job> sortedJobs = new ArrayList<>(jobs.values());
-        sortedJobs.sort(Comparator.comparingInt(job -> job.id));
-        for (Job job : sortedJobs) {
-            writeTo(out, "[" + job.id + "] Running " + job.commandLine + "\n");
-        }
+    reapCompletedJobs();
+
+    List<Job> sortedJobs = new ArrayList<>(jobs.values());
+    sortedJobs.sort(Comparator.comparingInt(job -> job.id));
+
+    for (Job job : sortedJobs) {
+
+        String status = String.format("%-24s", "Running");
+
+        writeTo(
+                out,
+                "[" + job.id + "]+  "
+                        + status
+                        + job.commandLine
+                        + "\n"
+        );
     }
+}
 
     private static String findExecutable(String command) {
         String path = System.getenv("PATH");
