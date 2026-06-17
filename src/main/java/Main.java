@@ -791,18 +791,35 @@ public class Main {
     }
 
     private static void listJobs(OutputStream out) throws IOException {
+
     reapCompletedJobs();
 
     List<Job> sortedJobs = new ArrayList<>(jobs.values());
     sortedJobs.sort(Comparator.comparingInt(job -> job.id));
 
-    for (Job job : sortedJobs) {
+    int n = sortedJobs.size();
+
+    for (int i = 0; i < n; i++) {
+
+        Job job = sortedJobs.get(i);
+
+        String marker = " ";
+
+        if (n == 1) {
+            marker = "+";
+        } else if (i == n - 1) {
+            marker = "+";
+        } else if (i == n - 2) {
+            marker = "-";
+        }
 
         String status = String.format("%-24s", "Running");
 
         writeTo(
                 out,
-                "[" + job.id + "]+  "
+                "[" + job.id + "]"
+                        + marker
+                        + "  "
                         + status
                         + job.commandLine
                         + "\n"
