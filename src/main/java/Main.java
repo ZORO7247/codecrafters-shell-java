@@ -16,183 +16,34 @@ import java.util.Set;
 public class Main {
     private static final String HOME = "~";
     private static final String PATH = "PATH";
-    private static final String PROMPT = "$ ";
     private static Path pwd = Paths.get(System.getProperty("user.dir"));
-    private static String lastAmbiguousPrefix = null;
-    private static List<String> lastAmbiguousMatches = new ArrayList<String>();
 
     public static void main(String[] args) throws Exception {
-        Terminal terminal = TerminalBuilder.builder().system(true).build();
-        DefaultParser parser = new DefaultParser();
-        parser.setEscapeChars(new char[0]);
-        LineReader lineReader =
-                LineReaderBuilder.builder().terminal(terminal).parser(parser).build();
-        configureTabCompletion(lineReader);
 
-        while (true) {
-            resetTabState();
-            String line = lineReader.readLine(PROMPT);
-            if (line != null && !line.isEmpty()) {
-                if (line.indexOf('|') >= 0) {
-                    runPipeline(line);
-                } else {
-                    Command command = parse(line);
-                    run(command);
-                }
-            }
+    java.util.Scanner scanner = new java.util.Scanner(System.in);
+
+    while (true) {
+
+        System.out.print("$ ");
+
+        if (!scanner.hasNextLine()) {
+            break;
+        }
+
+        String line = scanner.nextLine();
+
+        if (line == null || line.isEmpty()) {
+            continue;
+        }
+
+        if (line.contains("|")) {
+            runPipeline(line);
+        } else {
+            Command command = parse(line);
+            run(command);
         }
     }
-
-    private static void configureTabCompletion(LineReader lineReader) {
-        KeyMap mainKeyMap = lineReader.getKeyMaps().get(LineReader.MAIN);
-        mainKeyMap.bind(new Reference("my-complete"), "\t");
-        lineReader
-                .getWidgets()
-                .put(
-                        "my-complete",
-                        () -> {
-                            handleTab(lineReader);
-                            return true;
-                        });
-    }
-
-    private static void resetTabState() {
-        lastAmbiguousPrefix = null;
-        lastAmbiguousMatches = new ArrayList<String>();
-    }
-
-    private static void handleTab(LineReader lineReader) {
-        String buffer = lineReader.getBuffer().toString();
-        int cursor = lineReader.getBuffer().cursor();
-        if (cursor != buffer.length()) {
-            return;
-        }
-        String prefix = buffer;
-        if (prefix.length() == 0) {
-            beep(lineReader);
-            resetTabState();
-            return;
-        }
-
-        List<String> matches = getCommandCompletions(prefix);
-        if (matches.isEmpty()) {
-            beep(lineReader);
-            resetTabState();
-            return;
-        }
-
-        if (matches.size() == 1) {
-            String candidate = matches.get(0);
-            String newBuffer = candidate + " ";
-            lineReader.getBuffer().clear();
-            lineReader.getBuffer().write(newBuffer);
-            resetTabState();
-            return;
-        }
-
-        String lcp = longestCommonPrefix(matches);
-        if (lcp.length() > prefix.length()) {
-            lineReader.getBuffer().clear();
-            lineReader.getBuffer().write(lcp);
-            resetTabState();
-            return;
-        }
-
-        if (prefix.equals(lastAmbiguousPrefix) && matches.equals(lastAmbiguousMatches)) {
-            String list = joinWithDoubleSpace(matches);
-            var writer = lineReader.getTerminal().writer();
-            writer.write(System.lineSeparator());
-            writer.write(list);
-            writer.write(System.lineSeparator());
-            writer.write(PROMPT);
-            writer.write(prefix);
-            writer.flush();
-            resetTabState();
-            return;
-        }
-
-        beep(lineReader);
-        lastAmbiguousPrefix = prefix;
-        lastAmbiguousMatches = matches;
-    }
-
-    private static void beep(LineReader lineReader) {
-        lineReader.getTerminal().writer().write("\007");
-        lineReader.getTerminal().writer().flush();
-    }
-
-    private static List<String> getCommandCompletions(String prefix) {
-        List<String> result = new ArrayList<String>();
-        Set<String> seen = new HashSet<String>();
-
-        for (CommandName name : CommandName.values()) {
-            String cmd = name.name();
-            if (cmd.startsWith(prefix)) {
-                result.add(cmd);
-                seen.add(cmd);
-            }
-        }
-
-        String pathEnv = System.getenv(PATH);
-        if (pathEnv != null && !pathEnv.isEmpty()) {
-            String[] directories = pathEnv.split(System.getProperty("path.separator"));
-            for (String dir : directories) {
-                if (dir == null || dir.isEmpty()) {
-                    continue;
-                }
-                Path dirPath = Paths.get(dir);
-                if (!Files.isDirectory(dirPath)) {
-                    continue;
-                }
-                try (DirectoryStream<Path> stream = Files.newDirectoryStream(dirPath)) {
-                    for (Path p : stream) {
-                        if (Files.isRegularFile(p) && Files.isExecutable(p)) {
-                            String name = p.getFileName().toString();
-                            if (name.startsWith(prefix) && !seen.contains(name)) {
-                                result.add(name);
-                                seen.add(name);
-                            }
-                        }
-                    }
-                } catch (IOException e) {
-                }
-            }
-        }
-
-        Collections.sort(result);
-        return result;
-    }
-
-    private static String longestCommonPrefix(List<String> strings) {
-        if (strings.isEmpty()) {
-            return "";
-        }
-        String prefix = strings.get(0);
-        for (int i = 1; i < strings.size(); i++) {
-            String s = strings.get(i);
-            int j = 0;
-            int max = Math.min(prefix.length(), s.length());
-            while (j < max && prefix.charAt(j) == s.charAt(j)) {
-                j++;
-            }
-            prefix = prefix.substring(0, j);
-            if (prefix.isEmpty()) {
-                break;
-            }
-        }
-        return prefix;
-    }
-
-    private static String joinWithDoubleSpace(List<String> items) {
-        StringBuilder sb = new StringBuilder();
-        for (int i = 0; i < items.size(); i++) {
-            if (i > 0) {
-                sb.append("  ");
-            }
-            sb.append(items.get(i));
-        }
-        return sb.toString();
-    }
+}
 
     private static void runPipeline(String line) throws IOException, InterruptedException {
         ProcessBuilder pb = new ProcessBuilder("sh", "-c", line);
@@ -548,39 +399,4 @@ public class Main {
 
         return null;
     }
-
-    private static void runPipeline(String line, String currentDirectory)
-        throws Exception {
-
-    String[] parts = line.split("\\|", 2);
-
-    List<String> left = parseCommand(parts[0].trim());
-    List<String> right = parseCommand(parts[1].trim());
-
-    ProcessBuilder pb1 = new ProcessBuilder(left);
-    pb1.directory(new File(currentDirectory));
-
-    ProcessBuilder pb2 = new ProcessBuilder(right);
-    pb2.directory(new File(currentDirectory));
-
-    Process p1 = pb1.start();
-    Process p2 = pb2.start();
-
-    Thread pipeThread = new Thread(() -> {
-        try {
-            p1.getInputStream().transferTo(p2.getOutputStream());
-            p2.getOutputStream().close();
-        } catch (Exception ignored) {
-        }
-    });
-
-    pipeThread.start();
-
-    p2.getInputStream().transferTo(System.out);
-
-    pipeThread.join();
-
-    p1.waitFor();
-    p2.waitFor();
-}
 }
