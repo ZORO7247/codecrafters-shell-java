@@ -716,20 +716,36 @@ public class Main {
     }
 
     private static void completeCommand(List<String> args, OutputStream out) throws IOException {
-        if (args.size() == 4 && args.get(1).equals("-C")) {
-            completionSpecs.put(args.get(3), args.get(2));
-            return;
-        }
 
-        if (args.size() == 3 && args.get(1).equals("-p")) {
-            String completer = completionSpecs.get(args.get(2));
-            if (completer == null) {
-                writeTo(out, "complete: " + args.get(2) + ": no completion specification\n");
-            } else {
-                writeTo(out, "complete -C '" + completer + "' " + args.get(2) + "\n");
-            }
+    if (args.size() == 4 && args.get(1).equals("-C")) {
+        completionSpecs.put(args.get(3), args.get(2));
+        return;
+    }
+
+    if (args.size() == 3 && args.get(1).equals("-r")) {
+        completionSpecs.remove(args.get(2));
+        return;
+    }
+
+    if (args.size() == 3 && args.get(1).equals("-p")) {
+
+        String completer = completionSpecs.get(args.get(2));
+
+        if (completer == null) {
+            writeTo(out,
+                    "complete: "
+                            + args.get(2)
+                            + ": no completion specification\n");
+        } else {
+            writeTo(out,
+                    "complete -C '"
+                            + completer
+                            + "' "
+                            + args.get(2)
+                            + "\n");
         }
     }
+}
 
     private static void changeDirectory(List<String> args, OutputStream err) throws IOException {
         if (args.size() < 2) {
