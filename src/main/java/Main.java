@@ -678,17 +678,7 @@ public class Main {
         return id;
     }
 
-    private static void reapCompletedJobs() {
-        List<Integer> completed = new ArrayList<>();
-        for (Job job : jobs.values()) {
-            if (!job.process.isAlive()) {
-                completed.add(job.id);
-            }
-        }
-        for (Integer id : completed) {
-            jobs.remove(id);
-        }
-    }
+    private static void reapCompletedJobs() {}
 
     private static void executeBuiltin(List<String> args, OutputStream out, OutputStream err) throws Exception {
         String command = args.get(0);
@@ -792,10 +782,10 @@ public class Main {
 
     private static void listJobs(OutputStream out) throws IOException {
 
-    reapCompletedJobs();
-
     List<Job> sortedJobs = new ArrayList<>(jobs.values());
     sortedJobs.sort(Comparator.comparingInt(job -> job.id));
+
+    List<Integer> completedJobs = new ArrayList<>();
 
     int n = sortedJobs.size();
 
@@ -813,17 +803,46 @@ public class Main {
             marker = "-";
         }
 
-        String status = String.format("%-24s", "Running");
+        if (job.process.isAlive()) {
 
-        writeTo(
-                out,
-                "[" + job.id + "]"
-                        + marker
-                        + "  "
-                        + status
-                        + job.commandLine
-                        + "\n"
-        );
+            String status = String.format("%-24s", "Running");
+
+            writeTo(
+                    out,
+                    "[" + job.id + "]"
+                            + marker
+                            + "  "
+                            + status
+                            + job.commandLine
+                            + "\n"
+            );
+
+        } else {
+
+            String status = String.format("%-24s", "Done");
+
+            String command = job.commandLine;
+
+            if (command.endsWith("&")) {
+                command = command.substring(0, command.length() - 1).trim();
+            }
+
+            writeTo(
+                    out,
+                    "[" + job.id + "]"
+                            + marker
+                            + "  "
+                            + status
+                            + command
+                            + "\n"
+            );
+
+            completedJobs.add(job.id);
+        }
+    }
+
+    for (Integer id : completedJobs) {
+        jobs.remove(id);
     }
 }
 
