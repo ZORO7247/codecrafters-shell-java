@@ -1,11 +1,3 @@
-import org.jline.keymap.KeyMap;
-import org.jline.reader.LineReader;
-import org.jline.reader.LineReaderBuilder;
-import org.jline.reader.Reference;
-import org.jline.reader.impl.DefaultParser;
-import org.jline.terminal.Terminal;
-import org.jline.terminal.TerminalBuilder;
-
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.DirectoryStream;
@@ -556,4 +548,39 @@ public class Main {
 
         return null;
     }
+
+    private static void runPipeline(String line, String currentDirectory)
+        throws Exception {
+
+    String[] parts = line.split("\\|", 2);
+
+    List<String> left = parseCommand(parts[0].trim());
+    List<String> right = parseCommand(parts[1].trim());
+
+    ProcessBuilder pb1 = new ProcessBuilder(left);
+    pb1.directory(new File(currentDirectory));
+
+    ProcessBuilder pb2 = new ProcessBuilder(right);
+    pb2.directory(new File(currentDirectory));
+
+    Process p1 = pb1.start();
+    Process p2 = pb2.start();
+
+    Thread pipeThread = new Thread(() -> {
+        try {
+            p1.getInputStream().transferTo(p2.getOutputStream());
+            p2.getOutputStream().close();
+        } catch (Exception ignored) {
+        }
+    });
+
+    pipeThread.start();
+
+    p2.getInputStream().transferTo(System.out);
+
+    pipeThread.join();
+
+    p1.waitFor();
+    p2.waitFor();
+}
 }
