@@ -1,8 +1,9 @@
 import java.io.File;
 import java.io.PrintStream;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
-import java.util.Scanner;
+import java.util.Map;
 
 public class Main {
     static class Job {
@@ -21,18 +22,21 @@ public class Main {
         }
     }
 
+    static Map<String, String> completions = new HashMap<>();
     static List<Job> jobsList = new ArrayList<>();
 
     public static void main(String[] args) throws Exception {
-        Scanner sc = new Scanner(System.in);
         File currentDirectory = new File(System.getProperty("user.dir")).getCanonicalFile();
+
+        setTerminalRawMode();
+        Runtime.getRuntime().addShutdownHook(new Thread(Main::resetTerminalMode));
 
         while (true) {
             reapJobs();
 
             System.out.print("$ ");
-            if (!sc.hasNextLine()) break;
-            String input = sc.nextLine();
+            String input = readCommand();
+            if (input == null) break;
             String originalCommand = input.trim();
 
             if (originalCommand.isEmpty()) continue;
@@ -185,6 +189,25 @@ public class Main {
                         }
                     } else if (command.equals("jobs")) {
                         displayJobsList();
+                    } else if (command.equals("complete")) {
+                        if (parts.length >= 3) {
+                            String flag = parts[1];
+                            if (flag.equals("-C") && parts.length >= 4) {
+                                String script = parts[2];
+                                String cmdToComplete = parts[3];
+                                completions.put(cmdToComplete, script);
+                            } else if (flag.equals("-r")) {
+                                String cmdToComplete = parts[2];
+                                completions.remove(cmdToComplete);
+                            } else if (flag.equals("-p")) {
+                                String cmdToComplete = parts[2];
+                                if (completions.containsKey(cmdToComplete)) {
+                                    out.println("complete -C " + completions.get(cmdToComplete) + " " + cmdToComplete);
+                                } else {
+                                    out.println("complete: " + cmdToComplete + ": no completion specification");
+                                }
+                            }
+                        }
                     }
                 } finally {
                     if (redirectedOut != null) redirectedOut.close();
@@ -226,12 +249,53 @@ public class Main {
                 System.out.println(command + ": command not found");
             }
         }
-        sc.close();
+    }
+
+    private static void setTerminalRawMode() {
+        try {
+            ProcessBuilder pb = new ProcessBuilder("sh", "-c", "stty -icanon min 1 -echo");
+            pb.inheritIO();
+            pb.start().waitFor();
+        } catch (Exception e) {}
+    }
+
+    private static void resetTerminalMode() {
+        try {
+            ProcessBuilder pb = new ProcessBuilder("sh", "-c", "stty icanon echo");
+            pb.inheritIO();
+            pb.start().waitFor();
+        } catch (Exception e) {}
+    }
+
+    private static String readCommand() throws Exception {
+        StringBuilder sb = new StringBuilder();
+        while (true) {
+            int b = System.in.read();
+            if (b == -1) {
+                if (sb.length() == 0) return null;
+                return sb.toString();
+            }
+            char c = (char) b;
+            if (c == '\n') {
+                System.out.println();
+                return sb.toString();
+            } else if (c == 127 || c == '\b') {
+                if (sb.length() > 0) {
+                    sb.deleteCharAt(sb.length() - 1);
+                    System.out.print("\b \b");
+                }
+            } else if (c == '\t') {
+                System.out.print("\007");
+            } else {
+                sb.append(c);
+                System.out.print(c);
+            }
+        }
     }
 
     private static boolean isBuiltin(String cmd) {
         return cmd.equals("echo") || cmd.equals("type") || cmd.equals("pwd")
-                || cmd.equals("cd") || cmd.equals("jobs") || cmd.equals("exit");
+                || cmd.equals("cd") || cmd.equals("jobs") || cmd.equals("exit") || cmd.equals("complete");
     }
 
     private static File resolveFile(String path, File currentDirectory) {
