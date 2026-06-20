@@ -1,9 +1,7 @@
 import java.io.File;
 import java.io.PrintStream;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Scanner;
 
 public class Main {
@@ -24,7 +22,6 @@ public class Main {
     }
 
     static List<Job> jobsList = new ArrayList<>();
-    static Map<String, String> completionSpecs = new HashMap<>();
 
     public static void main(String[] args) throws Exception {
         Scanner sc = new Scanner(System.in);
@@ -34,22 +31,11 @@ public class Main {
             reapJobs();
 
             System.out.print("$ ");
-            System.out.flush(); 
-            
             if (!sc.hasNextLine()) break;
             String input = sc.nextLine();
-            
-            // Critical: If the test framework sent a trailing-space autocomplete test probe,
-            // make sure we don't duplicate formatting spaces in our downstream tokens.
             String originalCommand = input.trim();
-            if (originalCommand.isEmpty()) {
-                // If it was just spaces (like an autocomplete check), match the tester's print expectation
-                if (!input.isEmpty()) {
-                    System.out.print(input);
-                    System.out.flush();
-                }
-                continue;
-            }
+
+            if (originalCommand.isEmpty()) continue;
 
             boolean isBackground = false;
             String commandToParse = originalCommand;
@@ -199,8 +185,6 @@ public class Main {
                         }
                     } else if (command.equals("jobs")) {
                         displayJobsList();
-                    } else if (command.equals("complete")) {
-                        handleCompleteCommand(parts, out, err);
                     }
                 } finally {
                     if (redirectedOut != null) redirectedOut.close();
@@ -245,37 +229,9 @@ public class Main {
         sc.close();
     }
 
-    private static void handleCompleteCommand(String[] parts, PrintStream out, PrintStream err) {
-        if (parts.length < 2) return;
-        String action = parts[1];
-
-        if (action.equals("-c")) {
-            if (parts.length >= 4) {
-                String execPath = parts[2];
-                String targetCmd = parts[3];
-                completionSpecs.put(targetCmd, "complete -c " + execPath + " " + targetCmd);
-            }
-        } else if (action.equals("-r")) {
-            if (parts.length >= 3) {
-                String targetCmd = parts[2];
-                completionSpecs.remove(targetCmd);
-            }
-        } else if (action.equals("-p")) {
-            if (parts.length >= 3) {
-                String targetCmd = parts[2];
-                if (completionSpecs.containsKey(targetCmd)) {
-                    out.println(completionSpecs.get(targetCmd));
-                } else {
-                    err.println("complete: " + targetCmd + ": no completion specification");
-                }
-            }
-        }
-    }
-
     private static boolean isBuiltin(String cmd) {
         return cmd.equals("echo") || cmd.equals("type") || cmd.equals("pwd")
-                || cmd.equals("cd") || cmd.equals("jobs") || cmd.equals("exit")
-                || cmd.equals("complete");
+                || cmd.equals("cd") || cmd.equals("jobs") || cmd.equals("exit");
     }
 
     private static File resolveFile(String path, File currentDirectory) {
