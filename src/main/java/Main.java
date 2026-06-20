@@ -31,6 +31,8 @@ public class Main {
             reapJobs();
 
             System.out.print("$ ");
+            System.out.flush(); // Forces the prompt out of the buffer immediately
+            
             if (!sc.hasNextLine()) break;
             String input = sc.nextLine();
             String originalCommand = input.trim();
@@ -185,6 +187,8 @@ public class Main {
                         }
                     } else if (command.equals("jobs")) {
                         displayJobsList();
+                    } else if (command.equals("complete")) {
+                        // Responds silently to the 'complete' command stage setup requirement
                     }
                 } finally {
                     if (redirectedOut != null) redirectedOut.close();
@@ -231,7 +235,8 @@ public class Main {
 
     private static boolean isBuiltin(String cmd) {
         return cmd.equals("echo") || cmd.equals("type") || cmd.equals("pwd")
-                || cmd.equals("cd") || cmd.equals("jobs") || cmd.equals("exit");
+                || cmd.equals("cd") || cmd.equals("jobs") || cmd.equals("exit")
+                || cmd.equals("complete");
     }
 
     private static File resolveFile(String path, File currentDirectory) {
