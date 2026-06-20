@@ -285,7 +285,72 @@ public class Main {
                     System.out.print("\b \b");
                 }
             } else if (c == '\t') {
-                System.out.print("\007");
+                String currentBuffer = sb.toString();
+                String baseCmd = "";
+                int firstSpace = currentBuffer.indexOf(' ');
+                if (firstSpace == -1) {
+                    baseCmd = currentBuffer;
+                } else {
+                    baseCmd = currentBuffer.substring(0, firstSpace);
+                }
+
+                if (!baseCmd.isEmpty() && completions.containsKey(baseCmd)) {
+                    String script = completions.get(baseCmd);
+                    int lastSpace = currentBuffer.lastIndexOf(' ');
+                    String wordBeingCompleted = lastSpace == -1 ? currentBuffer : currentBuffer.substring(lastSpace + 1);
+                    String previousWord = baseCmd;
+                    if (lastSpace != -1) {
+                        String beforeLast = currentBuffer.substring(0, lastSpace).trim();
+                        int secondLastSpace = beforeLast.lastIndexOf(' ');
+                        previousWord = secondLastSpace == -1 ? beforeLast : beforeLast.substring(secondLastSpace + 1);
+                        if (previousWord.isEmpty()) previousWord = baseCmd;
+                    }
+
+                    try {
+                        ProcessBuilder pb = new ProcessBuilder(script, baseCmd, wordBeingCompleted, previousWord);
+                        Map<String, String> env = pb.environment();
+                        env.put("COMP_LINE", currentBuffer);
+                        env.put("COMP_POINT", String.valueOf(currentBuffer.length()));
+
+                        Process p = pb.start();
+                        String output = new String(p.getInputStream().readAllBytes()).trim();
+                        p.waitFor();
+
+                        if (!output.isEmpty()) {
+                            String[] completionsArray = output.split("\n");
+                            String lcp = completionsArray[0];
+                            for (int i = 1; i < completionsArray.length; i++) {
+                                String comp = completionsArray[i];
+                                int j = 0;
+                                while (j < lcp.length() && j < comp.length() && lcp.charAt(j) == comp.charAt(j)) {
+                                    j++;
+                                }
+                                lcp = lcp.substring(0, j);
+                            }
+
+                            if (lcp.startsWith(wordBeingCompleted) && lcp.length() >= wordBeingCompleted.length()) {
+                                String diff = lcp.substring(wordBeingCompleted.length());
+                                if (completionsArray.length == 1) {
+                                    diff += " ";
+                                }
+                                if (!diff.isEmpty()) {
+                                    sb.append(diff);
+                                    System.out.print(diff);
+                                } else {
+                                    System.out.print("\007");
+                                }
+                            } else {
+                                System.out.print("\007");
+                            }
+                        } else {
+                            System.out.print("\007");
+                        }
+                    } catch (Exception e) {
+                        System.out.print("\007");
+                    }
+                } else {
+                    System.out.print("\007");
+                }
             } else {
                 sb.append(c);
                 System.out.print(c);
