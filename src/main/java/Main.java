@@ -1,7 +1,9 @@
 import java.io.File;
 import java.io.PrintStream;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Scanner;
 
 public class Main {
@@ -22,6 +24,8 @@ public class Main {
     }
 
     static List<Job> jobsList = new ArrayList<>();
+    // Keep track of registered completion specifications (Command -> Spec/Arguments representation)
+    static Map<String, String> completionSpecs = new HashMap<>();
 
     public static void main(String[] args) throws Exception {
         Scanner sc = new Scanner(System.in);
@@ -31,7 +35,7 @@ public class Main {
             reapJobs();
 
             System.out.print("$ ");
-            System.out.flush(); // Forces the prompt out of the buffer immediately
+            System.out.flush(); 
             
             if (!sc.hasNextLine()) break;
             String input = sc.nextLine();
@@ -188,7 +192,7 @@ public class Main {
                     } else if (command.equals("jobs")) {
                         displayJobsList();
                     } else if (command.equals("complete")) {
-                        // Responds silently to the 'complete' command stage setup requirement
+                        handleCompleteCommand(parts, out, err);
                     }
                 } finally {
                     if (redirectedOut != null) redirectedOut.close();
@@ -231,6 +235,37 @@ public class Main {
             }
         }
         sc.close();
+    }
+
+    private static void handleCompleteCommand(String[] parts, PrintStream out, PrintStream err) {
+        if (parts.length < 2) return;
+
+        String action = parts[1];
+
+        if (action.equals("-c")) {
+            // Register execution spec: complete -c /path/to/executable command
+            if (parts.length >= 4) {
+                String execPath = parts[2];
+                String targetCmd = parts[3];
+                completionSpecs.put(targetCmd, "complete -c " + execPath + " " + targetCmd);
+            }
+        } else if (action.equals("-r")) {
+            // Unregister specification: complete -r command
+            if (parts.length >= 3) {
+                String targetCmd = parts[2];
+                completionSpecs.remove(targetCmd);
+            }
+        } else if (action.equals("-p")) {
+            // Print specification: complete -p command
+            if (parts.length >= 3) {
+                String targetCmd = parts[2];
+                if (completionSpecs.containsKey(targetCmd)) {
+                    out.println(completionSpecs.get(targetCmd));
+                } else {
+                    err.println("complete: " + targetCmd + ": no completion specification");
+                }
+            }
+        }
     }
 
     private static boolean isBuiltin(String cmd) {
